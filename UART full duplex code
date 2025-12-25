@@ -1,0 +1,112 @@
+/* 
+	baud rate = 115,200
+	
+	Set Parameter clk_per_bit as follows:
+	clk_per_bit = (Frequency of clk)/(baud rate)
+	Example: 50 MHz Clock, 115200 baud UART
+	(50,000,000)/(1,15,200) = 434
+*/
+module uart(
+	input [7:0]data_in,
+	input tx_start, clk, reset,
+	
+	input r_bit,
+	output reg t_bit,
+	output reg [7:0]data_out,
+	
+	output reg tx_active, rx_active,
+	output reg tx_complete, rx_complete
+);
+	reg [1:0] state_tx;
+	reg [1:0] state_rx;
+	
+	reg [9:0] shift_reg_t;
+	reg [9:0] shift_reg_r;
+	
+	reg [8:0] counter;
+	reg [3:0] index;
+	
+	parameter [8:0] clk_per_bit = 9'd434;
+	
+	parameter [1:0] ideal = 2'b00;
+	parameter [1:0] transmitte = 2'b01;
+	parameter [1:0] clean_up = 2'b10;
+	
+	initial begin
+		state_tx = ideal;
+		state_rx = ideal;
+		
+		shift_reg_r = 0;
+		shift_reg_t = 0;
+		
+		counter = 0;
+		index = 0;
+		
+		t_bit = 0;
+		data_out = 0;
+		tx_complete = 0;
+		rx_complete = 0;
+		tx_active = 0;
+		rx_active = 0;
+	end
+	
+	// Transmitter logic	
+	always @(posedge clk or posedge reset) begin
+		if(reset) begin
+			state_tx = ideal;	
+			shift_reg_t = 0;			
+			t_bit = 1;
+			tx_complete = 0;
+			tx_active = 0;
+			
+			counter = 0;
+			index = 0;
+		end
+		else begin
+			case (state_tx)
+				ideal: begin
+					if(tx_start == 1)begin
+						tx_active = 1;
+						t_bit = 0;
+						shift_reg_t = {1'b1, data_in, 1'b0};
+						state_tx = transmitte;
+					end
+					else begin
+						state_tx = ideal;
+					end
+				end
+				
+				transmitte: begin
+					t_bit = shift_reg_t[0];
+					if(counter < clk_per_bit) begin
+						counter = counter + 1;
+						state_tx = transmitte;
+					end
+					else begin
+						counter = 0;
+						if(index < 9) begin
+							state_tx = transmitte;
+						end
+						else begin
+							state_tx = clean_up;
+							tx_complete = 1;
+							tx_active = 0;
+						end
+						shift_reg_t = shift_reg_t>>1;
+					end
+				end
+
+				
+				clean_up: begin
+					t_bit = 1;
+					tx_complete = 0;
+					state_tx = ideal;
+				end
+				
+				default: begin
+					state_tx = ideal;
+				end
+			endcase
+		end
+	end
+endmodule
