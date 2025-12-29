@@ -1,0 +1,16 @@
+clk -> internal clk (N2)
+rst -> push_button_3 (W26)
+
+data_in -> switch(7-0) 
+data_out -> LEDR(7-0)
+
+t_bit -> GPIO_1/JP2 (2/B1) (K26) (right, right, top)
+r_bit -> GPIO_1/JP2 (40/B35) (W23) (right, right, bottom)
+
+rx_active -> LEDG(7) (Y18)
+rx_complete -> LEDG(8) (Y12)
+
+tx_active -> LEDG(0) (AE22)
+tx_complete -> LED(1) (AF22)
+
+t_start -> push_button_0 (G26)
