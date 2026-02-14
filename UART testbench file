@@ -47,7 +47,7 @@ module uart_tb;
         #20;
 
         // Send first byte
-        data_in = 8'b11110000;
+        data_in = 8'b10011010;
         tx_start = 1;
         #10;
         tx_start = 0;   // one clock pulse only
