@@ -1,0 +1,72 @@
+`timescale 1ns/1ps
+
+module uart_tb;
+
+    reg [7:0] data_in;
+    reg tx_start, clk, rst;
+
+    wire t_bit;
+    wire r_bit;
+    wire [7:0] data_out;
+
+    wire tx_active, rx_active;
+    wire tx_complete, rx_complete;
+
+    // Loopback connection
+    assign r_bit = t_bit;
+
+    // DUT
+    uart #(.clk_per_bit(10)) DUT (     // small value for fast simulation
+        .clk(clk),
+        .rst(rst),
+        .data_in(data_in),
+        .data_out(data_out),
+        .tx_start(tx_start),
+        .r_bit(r_bit),
+        .t_bit(t_bit),
+        .tx_active(tx_active),
+        .rx_active(rx_active),
+        .tx_complete(tx_complete),
+        .rx_complete(rx_complete)
+    );
+
+    // Clock generation (100 MHz)
+    always #5 clk = ~clk;
+
+    initial begin
+        // Initialize
+        clk = 1;
+        rst = 0;
+        tx_start = 0;
+        data_in = 0;
+
+        // Reset pulse
+        #20;
+        rst = 1;
+
+        #20;
+
+        // Send first byte
+        data_in = 8'b11110000;
+        tx_start = 1;
+        #10;
+        tx_start = 0;   // one clock pulse only
+
+        // Wait for reception
+        wait(rx_complete);
+
+        #20;
+
+        $display("Transmitted = %b", data_in);
+        $display("Received    = %b", data_out);
+
+        if (data_out == data_in)
+            $display("SUCCESS");
+        else
+            $display("FAILED");
+
+        #50;
+        $finish;
+    end
+
+endmodule
