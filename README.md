@@ -1,25 +1,16 @@
 # UART Using Verilog HDL
 
-This repository contains a synthesizable and parameterized implementation of a Universal Asynchronous Receiver/Transmitter (UART) written in Verilog HDL. The design operates using a system clock and allows the user to configure only:
+## 📌 Overview
 
-- Clock Frequency  
-- Baud Rate  
-- Data Width  
+This repository contains a synthesizable implementation of a Universal Asynchronous Receiver/Transmitter (UART) written in Verilog HDL. The design supports full-duplex serial communication and is intended for FPGA-based systems operating at a 50 MHz clock frequency.
 
-The internal timing required for UART communication is derived automatically from the provided clock frequency and baud rate.
+The UART timing is controlled by a user-defined parameter called CLKS_PER_BIT, which must be manually calculated using the system clock and desired baud rate.
 
 ---
 
-## 📌 1. Basic Introduction to UART
+## 📌 Basic Concept of UART
 
-UART (Universal Asynchronous Receiver/Transmitter) is a hardware-based serial communication protocol used to transfer data between digital systems without a shared clock line.
-
-Key Characteristics:
-
-- Asynchronous communication
-- Two primary signals: TX (Transmit) and RX (Receive)
-- Full-duplex communication support
-- Widely used in FPGAs, microcontrollers, and embedded systems
+UART (Universal Asynchronous Receiver/Transmitter) is an asynchronous serial communication protocol. It does not use a shared clock signal between transmitter and receiver. Instead, both sides agree on a communication speed known as the baud rate.
 
 A standard UART frame consists of:
 
@@ -27,88 +18,97 @@ A standard UART frame consists of:
 - N Data bits (LSB first)
 - 1 Stop bit (logic 1)
 
-Both communicating devices must operate at the same baud rate for reliable data transfer.
+Since there is no shared clock, both transmitter and receiver must use identical timing derived from their local clock.
 
 ---
 
-## 📌 2. Core Timing Concept
+## 📌 Core Timing Principle
 
-Since UART does not use an external clock, timing must be generated internally using the system clock.
+The UART in this repository uses the system clock (50 MHz) to generate the required baud timing.
 
-The number of clock cycles required for one UART bit is derived from:
+To determine how long each UART bit should last, the number of clock cycles per bit must be calculated.
+
+This value is called:
+
+CLKS_PER_BIT
+
+The user must compute this value manually and provide it to the design.
+
+---
+
+## 📌 Clock Per Bit Calculation
+
+The formula used is:
 
 CLKS_PER_BIT = CLOCK_FREQUENCY / BAUD_RATE
 
-The user provides:
+Where:
 
-- CLOCK_FREQUENCY (for example, 50 MHz)
-- BAUD_RATE (for example, 9600 or 115200)
+CLOCK_FREQUENCY = 50,000,000 Hz  
+BAUD_RATE = Desired communication speed  
 
-The design calculates the required timing internally using these parameters.
+### Example for 9600 Baud
 
----
+CLKS_PER_BIT = 50,000,000 / 9600  
+CLKS_PER_BIT ≈ 5208  
 
-## 📌 3. Example Calculations (50 MHz Clock)
+### Example for 115200 Baud
 
-For 9600 baud:
+CLKS_PER_BIT = 50,000,000 / 115200  
+CLKS_PER_BIT ≈ 434  
 
-50,000,000 / 9600 ≈ 5208 clock cycles per bit  
+The calculated integer value must be supplied to the UART modules for proper operation.
 
-For 115200 baud:
-
-50,000,000 / 115200 ≈ 434 clock cycles per bit  
-
-Changing the baud rate automatically changes the bit timing.
+The design does NOT automatically compute this value internally.
 
 ---
 
-## 📌 4. Design Features
+## 📌 Design Features
 
-- User-defined clock frequency  
-- User-defined baud rate  
-- User-defined data width  
-- Automatic internal timing calculation  
-- Full-duplex UART (TX + RX)  
-- FSM-based architecture  
-- Fully synthesizable RTL  
-- Suitable for FPGA implementation  
-
----
-
-## 📌 5. Transmitter Operation
-
-1. Remains in IDLE state with TX line high  
-2. On transmit request, sends Start bit  
-3. Transmits DATA_WIDTH bits (LSB first)  
-4. Sends Stop bit  
-5. Returns to IDLE state  
-6. Indicates busy status during transmission  
+- Designed for 50 MHz system clock
+- User-defined CLKS_PER_BIT
+- User-defined DATA_WIDTH
+- Separate TX and RX state machines
+- Full-duplex communication
+- Synthesizable RTL
+- Modular and reusable structure
 
 ---
 
-## 📌 6. Receiver Operation
+## 📌 Transmitter Operation
 
-1. Detects Start bit (falling edge on RX line)  
-2. Waits half bit duration for mid-bit sampling  
-3. Samples DATA_WIDTH bits  
-4. Checks Stop bit  
-5. Asserts receive-done signal when frame is complete  
-
-Correct sampling depends on proper clock frequency and baud rate selection.
-
----
-
-## 📌 7. Application Areas
-
-- FPGA to PC serial communication  
-- Embedded system debugging  
-- Microcontroller interfacing  
-- Serial data logging systems  
-- Academic digital design projects  
-- Hardware communication experiments  
+1. Remains in IDLE state with TX line high.
+2. When transmission starts, sends Start bit (logic 0).
+3. Transmits DATA_WIDTH bits (LSB first).
+4. Sends Stop bit (logic 1).
+5. Returns to IDLE state.
+6. Busy signal remains active during transmission.
 
 ---
 
-## 📌 8. Summary
+## 📌 Receiver Operation
 
-This UART implementation provides a clean, configurable, and reusable serial communication core. The user defines only the clock frequency and baud rate, and the internal design derives the required timing automatically, making the module flexible and easy to adapt to different communication requirements.
+1. Monitors RX line for falling edge (Start bit).
+2. Waits half bit duration to sample in the center of the bit.
+3. Samples DATA_WIDTH bits.
+4. Waits for Stop bit.
+5. Asserts receive-done signal after successful reception.
+
+Correct sampling accuracy depends entirely on proper CLKS_PER_BIT calculation.
+
+---
+
+## 📌 Applications
+
+- FPGA to PC serial communication
+- Embedded debugging interface
+- Microcontroller communication
+- Serial console systems
+- Data logging
+- Academic digital design projects
+
+---
+
+## 📌 Summary
+
+This UART implementation provides a configurable and reusable serial communication core for FPGA systems. Timing accuracy depends on correct manual calculation of CLKS_PER_BIT using the system clock frequency and desired baud rate.
