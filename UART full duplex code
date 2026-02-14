@@ -6,163 +6,143 @@
 	Example: 50 MHz Clock, 115200 baud UART
 	(50,000,000)/(1,15,200) = 434
 */
-module uart(
-	input [7:0]data_in,
-	input tx_start, clk, reset,
-	
-	input r_bit,
-	output reg t_bit,extra,
-	output reg [7:0]data_out,
-	
-	output reg tx_active, rx_active,
-	output reg tx_complete, rx_complete
-);
-	reg [1:0] state_tx,state_rx;	
-	reg [9:0] shift_reg_t, shift_reg_r;
-	reg [8:0] counter_tx, counter_rx;
-	reg [3:0] index_tx, index_rx;
-	
-	parameter [8:0] clk_per_bit = 9'd434;
-	
-	parameter [1:0] ideal = 2'b00;
-	parameter [1:0] communicatioin = 2'b01;
-	parameter [1:0] clean_up = 2'b10;
-	
-	initial begin
-		t_bit = 1;
-	end
-		
-		
-	//Receiver logic
-	always @(posedge clk or posedge reset) begin
-		if(reset) begin
-			state_rx <= ideal;
-			shift_reg_r <= 0;
-			
-			rx_complete <= 0;			
-			rx_active <= 0;
-			data_out <= 0;
-			
-			counter_rx <= 0;
-			index_rx <= 0;
-		end
-		else begin
-			case (state_rx)
-				ideal: begin
-					if(!r_bit) begin
-						rx_active <= 1;
-						state_rx <= communicatioin;
-					end
-					else begin
-						state_rx <= ideal;
-					end
-				end
-				
-				communicatioin: begin
-					if(counter_rx == 217) begin
-						shift_reg_r[9] <= r_bit;
-					end
-					
-					if(counter_rx < clk_per_bit) begin
-						counter_rx <= counter_rx + 1;
-						state_rx <= communicatioin;
-					end
-					else begin
-						//shift_reg_r <= shift_reg_r >> 1;
-						shift_reg_r <= {1'b0, shift_reg_r[9:1]};
-						counter_rx <= 0;
-						if(index_rx < 10) begin
-							index_rx <= index_rx + 1;
-							state_rx <= communicatioin;
-						end
-						else begin
-							state_rx <= clean_up;
-							rx_complete <= 1;
-							rx_active <= 0;
-						end
-					end
-				end
-				
-				clean_up: begin
-					state_rx <= ideal;
-					shift_reg_r <= 0;
-					rx_complete <= 0;	
-					
-					counter_rx <= 0;
-					index_rx <= 9;		
-				end			
-				
-				default: begin
-					state_rx <= ideal;
-				end
-			endcase
-		end
-	end
-	
-	
-	// Transmitter logic	
-	always @(posedge clk or posedge reset) begin
-		extra <= t_bit;
-		if(reset) begin
-			state_tx <= ideal;
-			shift_reg_t <= 0;
-			t_bit <= 1;
-			tx_complete = 0;
-			tx_active = 0;
-			
-			counter_tx <= 0;
-			index_tx <= 0;
-		end
-		else begin
-			case (state_tx)
-				ideal: begin
-					if(tx_start == 1)begin
-						tx_active <= 1;
-						shift_reg_t <= {1'b1, data_in, 1'b0};
-						state_tx <= communicatioin;
-					end
-					else begin
-						state_tx <= ideal;
-					end
-				end
-				
-				communicatioin: begin
-					t_bit <= shift_reg_t[0];
-					if(counter_tx < clk_per_bit) begin
-						counter_tx <= counter_tx + 1;
-						state_tx <= communicatioin;
-					end
-					else begin
-						//shift_reg_t <= shift_reg_t>>1;
-						shift_reg_t <= {1'b0, shift_reg_t[9:1]};
-						counter_tx <= 0;
-						if(index_tx < 10) begin
-							index_tx <= index_tx + 1;
-							state_tx <= communicatioin;
-						end
-						else begin
-							state_tx <= clean_up;
-							tx_complete <= 1;
-							tx_active <= 0;
-						end
-					end
-				end
+module uart #(parameter integer clk_per_bit = 434)(
+    input  [7:0] data_in,
+    input        tx_start,
+    input        clk,
+    input        rst,
 
-				
-				clean_up: begin
-					state_tx <= ideal;	
-					shift_reg_t <= 0;			
-					t_bit <= 1;
-					tx_complete <= 0;
-			
-					counter_tx <= 0;
-					index_tx <= 0;
-				end
-				
-				default: begin
-					state_tx <= ideal;
-				end
-			endcase
-		end
-	end
+    input        r_bit,
+    output reg   t_bit,
+    output reg [7:0] data_out,
+
+    output reg tx_active,
+    output reg rx_active,
+    output reg tx_complete,
+    output reg rx_complete
+);
+    // States
+    parameter [1:0] ideal = 2'b00,
+                    communicatioin = 2'b01,
+                    clean_up = 2'b10;
+
+    reg [1:0] state_tx, state_rx;
+    reg [9:0] shift_reg_t, shift_reg_r;
+    reg [15:0] counter_tx, counter_rx;
+    reg [3:0] index_tx, index_rx;
+
+    // TRANSMITTER
+    always @(posedge clk or negedge rst) begin
+        if(!rst) begin
+            state_tx    <= ideal;
+            shift_reg_t <= 0;
+            counter_tx  <= 0;
+            index_tx    <= 0;
+            t_bit       <= 1;
+            tx_active   <= 0;
+            tx_complete <= 0;
+        end
+        else begin
+            case(state_tx)
+
+            ideal: begin
+                tx_complete <= 0;
+                t_bit <= 1;
+
+                if(tx_start) begin
+                    tx_active   <= 1;
+                    shift_reg_t <= {1'b1, data_in, 1'b0};
+                    counter_tx  <= 0;
+                    index_tx    <= 0;
+                    state_tx    <= communicatioin;
+                end
+            end
+
+            communicatioin: begin
+                t_bit <= shift_reg_t[0];
+
+                if(counter_tx < clk_per_bit-1)
+                    counter_tx <= counter_tx + 1;
+                else begin
+                    counter_tx  <= 0;
+                    shift_reg_t <= shift_reg_t >> 1;
+                    index_tx    <= index_tx + 1;
+
+                    if(index_tx == 9)
+                        state_tx <= clean_up;
+                end
+            end
+
+            clean_up: begin
+                tx_active   <= 0;
+                tx_complete <= 1;
+                state_tx    <= ideal;
+            end
+
+            endcase
+        end
+    end
+
+    // RECEIVER
+
+    always @(posedge clk or negedge rst) begin
+        if(!rst) begin
+            state_rx    <= ideal;
+            shift_reg_r <= 0;
+            counter_rx  <= 0;
+            index_rx    <= 0;
+            rx_active   <= 0;
+            rx_complete <= 0;
+            data_out    <= 0;
+        end
+        else begin
+            case(state_rx)
+
+            ideal: begin
+                rx_complete <= 0;
+
+                if(r_bit == 0) begin  // detect start bit
+                    rx_active  <= 1;
+                    counter_rx <= 0;
+                    state_rx   <= communicatioin;
+                end
+            end
+
+            communicatioin: begin
+
+                if(counter_rx == clk_per_bit/2) begin
+                    // Sample in middle of each bit
+
+                    if(index_rx == 0) begin
+                        // still start bit, ignore
+                    end
+                    else if(index_rx >= 1 && index_rx <= 8) begin
+                        shift_reg_r <= {r_bit, shift_reg_r[7:1]};
+                        //$display("t_bit = ",t_bit);
+                    end
+
+                    index_rx <= index_rx + 1;
+                end
+
+                if(counter_rx < clk_per_bit-1)
+                    counter_rx <= counter_rx + 1;
+                else
+                    counter_rx <= 0;
+
+                if(index_rx == 9) 
+                    state_rx <= clean_up;
+            end
+
+            clean_up: begin
+                data_out    <= shift_reg_r;
+                rx_complete <= 1;
+                rx_active   <= 0;
+                index_rx    <= 0;
+                state_rx    <= ideal;
+            end
+
+            endcase
+        end
+    end
+
 endmodule
