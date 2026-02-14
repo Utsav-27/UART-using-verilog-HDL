@@ -145,4 +145,4 @@ module uart #(
         end
     end
 
-endmodule
+endmodule 
